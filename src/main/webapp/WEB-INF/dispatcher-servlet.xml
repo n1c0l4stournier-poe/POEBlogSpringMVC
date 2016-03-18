@@ -1,0 +1,135 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:jee="http://www.springframework.org/schema/jee"
+	xmlns:util="http://www.springframework.org/schema/util" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:security="http://www.springframework.org/schema/security"
+
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+                           http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+                           http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+                           http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd 
+                           http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee.xsd
+                           http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd 
+                           http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.2.xsd ">
+
+	<context:annotation-config />
+
+	<context:component-scan base-package="fr.treeptik" />
+
+	<mvc:annotation-driven />
+
+	<jdbc:initialize-database data-source="dataSource">
+		<jdbc:script location="classpath:init.sql" />
+	</jdbc:initialize-database>
+
+	<!-- Aide la Servlet à trouvé la bonne vue en se basant sur le nom logique 
+		compris dans le ModelAndView des controllers en y ajoutant prefixe et suffixe -->
+	<bean id="viewResolver"
+		class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="viewClass"
+			value="org.springframework.web.servlet.view.JstlView" />
+		<property name="prefix" value="/pages/" />
+		<property name="suffix" value=".jsp" />
+	</bean>
+
+	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="url" value="jdbc:mysql://localhost:3306/blog" />
+		<property name="username" value="root" />
+		<property name="password" value="root" />
+	</bean>
+
+	<bean id="entityManagerFactory"
+		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="packagesToScan" value="fr.treeptik" />
+		<property name="jpaVendorAdapter">
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+				<property name="showSql" value="true" />
+				<!--Mettre true pour etre en create/update et false pour validate -->
+				<property name="generateDdl" value="true" />
+				<property name="databasePlatform" value="org.hibernate.dialect.MySQLDialect" />
+			</bean>
+		</property>
+	</bean>
+
+
+	<bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager"
+		p:entityManagerFactory-ref="entityManagerFactory" />
+
+	<tx:annotation-driven transaction-manager="transactionManager" />
+
+	<bean id="localeResolver"
+		class="org.springframework.web.servlet.i18n.SessionLocaleResolver">
+		<property name="defaultLocale" value="FR" />
+	</bean>
+
+	<!-- Register a “LocaleChangeInterceptor” interceptor and reference it to 
+		any handler mapping that need to supports the multiple languages. The “paramName” 
+		is the parameter value that’s used to set the locale. -->
+	<mvc:interceptors>
+		<bean id="localeChangeInterceptor" class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor">
+			<property name="paramName" value="lang" />
+		</bean>
+	</mvc:interceptors>
+
+	<bean id="localeChangeInterceptorLogin"
+		class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor">
+		<property name="paramName" value="lang" />
+	</bean>
+
+	<bean id="messageSource"
+		class="org.springframework.context.support.ResourceBundleMessageSource">
+		<property name="basenames">
+			<list>
+				<value>message</value>
+			</list>
+		</property>
+		<property name="fallbackToSystemLocale" value="false" />
+		<property name="defaultEncoding" value="UTF-8" />
+	</bean>
+
+	<security:global-method-security jsr250-annotations="enabled" secured-annotations="enabled" />
+
+	<security:http pattern="/login.do" security="none" />
+	<security:http pattern="/auteurs/save.do" security="none" />
+	<security:http pattern="/auteurs/create.do" security="none" />
+	<security:http pattern="/template/images/**" security="none" />
+	<security:http pattern="/template/css/**" security="none" />
+
+	<security:http auto-config="true" use-expressions="true">
+		<security:form-login login-page="/login.do" default-target-url="/articles/index.do" authentication-failure-url="/" always-use-default-target='true' />
+		<security:intercept-url pattern="*login.do" access="permitAll" />
+		<security:intercept-url pattern="*delete.do" access="hasAnyRole('ROLE_ADMIN')" />
+		<!-- Articles -->
+		<security:intercept-url pattern="/articles/update.do" access="hasAnyRole('ROLE_AUTEUR','ROLE_ADMIN')" />
+		<security:intercept-url pattern="/articles/create.do" access="hasAnyRole('ROLE_AUTEUR','ROLE_ADMIN')" />
+		<security:intercept-url pattern="/articles/save.do" access="hasAnyRole('ROLE_AUTEUR','ROLE_ADMIN')" />
+		<!-- Images -->
+		<security:intercept-url pattern="/images/create.do" access="hasAnyRole('ROLE_AUTEUR','ROLE_ADMIN')" />
+		<security:intercept-url pattern="/images/save.do" access="hasAnyRole('ROLE_AUTEUR','ROLE_ADMIN')" />
+		<!-- Auteurs -->
+		<security:intercept-url pattern="/auteurs/delete.do" access="hasAnyRole('ROLE_ADMIN')" />
+		<security:intercept-url pattern="/auteurs/update.do" access="hasAnyRole('ROLE_ADMIN')" />
+		<!-- Categories -->
+		<security:intercept-url pattern="/categories/**" access="hasAnyRole('ROLE_ADMIN')" />
+		<!-- Commentaires -->
+		<security:intercept-url pattern="/commentaires/delete.do" access="hasAnyRole('ROLE_ADMIN')" />
+		<security:intercept-url pattern="/**" access="hasAnyRole('ROLE_USER','ROLE_AUTEUR','ROLE_ADMIN')" />
+		<security:logout logout-url="/logout" logout-success-url="/" />
+		<security:access-denied-handler error-page="/403" />
+	</security:http>
+
+	<security:authentication-manager>
+		<security:authentication-provider>
+			<security:jdbc-user-service
+				data-source-ref="dataSource"
+				users-by-username-query="SELECT c.mail, c.password, 'true' as enabled FROM Auteur c WHERE c.mail=?"
+				authorities-by-username-query="SELECT c.mail, c.role FROM Auteur c WHERE c.mail=?" />
+		</security:authentication-provider>
+	</security:authentication-manager>
+
+
+</beans>
